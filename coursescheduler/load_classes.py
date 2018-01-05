@@ -25,12 +25,12 @@ Importing a new set of classes:
 """
 
 LETTER_TO_DAY = {
-    'M': datetime(2017, 1, 1),
-    'T': datetime(2017, 1, 2),
-    'W': datetime(2017, 1, 3),
-    'R': datetime(2017, 1, 4),
-    'F': datetime(2017, 1, 5),
-    'S': datetime(2017, 1, 6),
+    'M': datetime(2018, 1, 1),
+    'T': datetime(2018, 1, 2),
+    'W': datetime(2018, 1, 3),
+    'R': datetime(2018, 1, 4),
+    'F': datetime(2018, 1, 5),
+    'S': datetime(2018, 1, 6),
 }
 
 

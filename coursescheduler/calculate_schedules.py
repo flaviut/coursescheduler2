@@ -12,6 +12,8 @@ class TimeSpanSet:
     def __init__(self):
         self._start_time = None
         self._backing_int = 0
+        for i in range(1, 6):
+            self.add_range(datetime(2018, 1, i, 0, 0), datetime(2018, 1, i, 8, 59))
 
     def _datetime_to_index(self, time) -> int:
         time_range = (time.replace(second=0, microsecond=0) -
@@ -39,13 +41,9 @@ class TimeSpanSet:
         idx_range = end_idx - start_idx
         range_mask = ((1 << (idx_range + 1)) - 1) << start_idx
 
-        result = False
-        if self._backing_int & range_mask:
-            result = True
-
+        has_overlap = (self._backing_int & range_mask) > 0
         self._backing_int |= range_mask
-
-        return result
+        return has_overlap
 
     def __contains__(self, time):
         if self._start_time is None or time < self._start_time:
@@ -53,12 +51,21 @@ class TimeSpanSet:
         time_idx = self._datetime_to_index(time)
         return (self._backing_int & (1 << time_idx)) > 0
 
+    def copy(self):
+        result = TimeSpanSet()
+        result._start_time = self._start_time
+        result._backing_int = self._backing_int
+        return result
+
 
 def is_valid(schedule: List[CourseOffering]) -> bool:
     timeset = TimeSpanSet()
     for cls in schedule:
+        if cls.crn == 14855:
+            return False
         for slot in cls.times:
-            if timeset.add_range(slot[0], slot[1]):
+            has_overlap = timeset.add_range(slot[0], slot[1])
+            if has_overlap:
                 # overlap occurred
                 return False
     return True
@@ -66,16 +73,25 @@ def is_valid(schedule: List[CourseOffering]) -> bool:
 
 def filter_my_courses(courselist: List[CourseOffering]) -> List[CourseOffering]:
     return [course for course in courselist
-            if course.course in {'CSC 4350', 'MATH 3030', 'CSC 3320',
-                                 'CSC 4330', 'CSC 4520'}]
+            if course.course in {'CSC 2720', 'MATH 3030', 'CSC 3320',
+                                 'CSC 4330', 'PHYS 2212K'}]
 
 
 def get_all_schedules(courses: List[CourseOffering]):
     grouped_schedules = [list(v[1]) for v in
                          groupby(courses, key=lambda a: a.course)]
-    for schedule in product(*grouped_schedules):
+    for schedule in sorted(product(*grouped_schedules),
+                           key=lambda sch: sum((1 if v.remaining_capacity > 0 else 0) for v in sch)):
         if is_valid(schedule):
-            print([(v.crn, v.course, v.remaining_capacity) for v in schedule])
+            for v in sorted(schedule, key=lambda v: v.times):
+                print('''\
+{course} (#{crn}, {remaining_capacity} left)
+{location}'''.format(**v._asdict()))
+                for time in v.times:
+                    print('{:%a %H:%M}-{:%H:%M}'.format(*time))
+            print('=' * 30)
+
+
 
 
 if __name__ == '__main__':
