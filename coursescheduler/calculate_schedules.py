@@ -13,7 +13,8 @@ class TimeSpanSet:
         self._start_time = None
         self._backing_int = 0
         for i in range(1, 6):
-            self.add_range(datetime(2018, 1, i, 0, 0), datetime(2018, 1, i, 8, 59))
+            self.add_range(datetime(2018, 1, i, 0, 0),
+                           datetime(2018, 1, i, 8, 59))
 
     def _datetime_to_index(self, time) -> int:
         time_range = (time.replace(second=0, microsecond=0) -
@@ -60,9 +61,11 @@ class TimeSpanSet:
 
 def is_valid(schedule: List[CourseOffering]) -> bool:
     timeset = TimeSpanSet()
+    for i in range(1, 7):
+        timeset.add_range(datetime(2018, 1, i, 0, 0),
+                          datetime(2018, 1, i, 10, 0))
+
     for cls in schedule:
-        if cls.crn == 14855:
-            return False
         for slot in cls.times:
             has_overlap = timeset.add_range(slot[0], slot[1])
             if has_overlap:
@@ -73,27 +76,36 @@ def is_valid(schedule: List[CourseOffering]) -> bool:
 
 def filter_my_courses(courselist: List[CourseOffering]) -> List[CourseOffering]:
     return [course for course in courselist
-            if course.course in {'CSC 2720', 'MATH 3030', 'CSC 3320',
-                                 'CSC 4330', 'PHYS 2212K'}]
+            if course.course in {
+                'CSC 4310',
+                'CSC 4330',
+                'CSC 4210',
+                'ECON 2100',
+                'PHIL 1010'}]
 
 
 def get_all_schedules(courses: List[CourseOffering]):
     grouped_schedules = [list(v[1]) for v in
                          groupby(courses, key=lambda a: a.course)]
     for schedule in sorted(product(*grouped_schedules),
-                           key=lambda sch: sum((1 if v.remaining_capacity > 0 else 0) for v in sch)):
+                           key=lambda sch: sum(
+                               (1 if v.remaining_capacity > 0 else 0) for v in
+                               sch)):
         if is_valid(schedule):
-            for v in sorted(schedule, key=lambda v: v.times):
-                print('''\
-{course} (#{crn}, {remaining_capacity} left)
-{location}'''.format(**v._asdict()))
-                for time in v.times:
-                    print('{:%a %H:%M}-{:%H:%M}'.format(*time))
-            print('=' * 30)
-
-
+            yield schedule
 
 
 if __name__ == '__main__':
-    get_all_schedules(
-        filter_my_courses(parse_file('../resources/gsu courses.html')))
+    results = sorted(
+        get_all_schedules(
+            filter_my_courses(
+                parse_file('../resources/gsu courses.html'))))
+    print("found {} unique schedules".format(len(results)))
+    for schedule in results:
+        for v in sorted(schedule, key=lambda v: v.times):
+            print('''\
+{course} {instructor} (#{crn}, {remaining_capacity} left)
+{location}'''.format(**v._asdict()))
+            for time in v.times:
+                print('{:%a %H:%M}-{:%H:%M}'.format(*time))
+        print('=' * 30)
