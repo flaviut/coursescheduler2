@@ -67,7 +67,7 @@ def date_time_strings_to_schedule(
     return result
 
 
-def parse_file(filename: str):
+def parse_file(filename: str) -> List[CourseOffering]:
     document = html.parse(filename)
     rows = document.xpath(
         '//table[@class="datadisplaytable"]/tbody/tr[td[@class="dddefault"]]')

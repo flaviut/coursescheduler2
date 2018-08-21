@@ -1,6 +1,6 @@
 from datetime import datetime
 from itertools import groupby, product
-from typing import List, Tuple
+from typing import List, Tuple, Set
 
 from coursescheduler.common import CourseOffering
 from coursescheduler.load_classes import parse_file
@@ -8,33 +8,34 @@ from coursescheduler.load_classes import parse_file
 CourseTimes = List[Tuple[datetime, datetime]]
 
 
+def _normalize_datetime(time_in: datetime):
+    if time_in.second != 0 or time_in.microsecond != 0:
+        return time_in.replace(second=0, microsecond=0)
+    return time_in
+
+
 class TimeSpanSet:
     def __init__(self):
         self._start_time = None
         self._backing_int = 0
-        for i in range(1, 6):
-            self.add_range(datetime(2018, 1, i, 0, 0),
-                           datetime(2018, 1, i, 8, 59))
 
-    def _datetime_to_index(self, time) -> int:
-        time_range = (time.replace(second=0, microsecond=0) -
-                      self._start_time)
-        time_idx = time_range.total_seconds() / 60
-        return int(time_idx)
+    def _datetime_to_index(self, time_in) -> int:
+        time_range = _normalize_datetime(time_in) - self._start_time
+        return int(time_range.total_seconds() / 60)
 
     def add_range(self, start, end) -> bool:
         """Adds the range to the set. If there's an overlap, returns True,
         otherwise False"""
-        start = start.replace(second=0, microsecond=0)
-        end = end.replace(second=0, microsecond=0)
+        start = _normalize_datetime(start)
+        end = _normalize_datetime(end)
         assert end > start
 
         if self._start_time is None:
-            self._start_time = start.replace(second=0, microsecond=0)
+            self._start_time = start
 
         if start < self._start_time:
             delta = int((self._start_time - start).total_seconds() / 60)
-            self._start_time = start.replace(second=0, microsecond=0)
+            self._start_time = start
             self._backing_int = self._backing_int << delta
 
         start_idx = self._datetime_to_index(start)
@@ -47,6 +48,7 @@ class TimeSpanSet:
         return has_overlap
 
     def __contains__(self, time):
+        time = _normalize_datetime(time)
         if self._start_time is None or time < self._start_time:
             return False
         time_idx = self._datetime_to_index(time)
@@ -59,11 +61,9 @@ class TimeSpanSet:
         return result
 
 
-def is_valid(schedule: List[CourseOffering]) -> bool:
-    timeset = TimeSpanSet()
-    for i in range(1, 7):
-        timeset.add_range(datetime(2018, 1, i, 0, 0),
-                          datetime(2018, 1, i, 10, 0))
+def is_valid(schedule: List[CourseOffering],
+             dead_zones: TimeSpanSet) -> bool:
+    timeset = dead_zones.copy()
 
     for cls in schedule:
         for slot in cls.times:
@@ -74,34 +74,27 @@ def is_valid(schedule: List[CourseOffering]) -> bool:
     return True
 
 
-def filter_my_courses(courselist: List[CourseOffering]) -> List[CourseOffering]:
+def filter_my_courses(courselist: List[CourseOffering],
+                      intersting_courses: Set[str]) -> List[CourseOffering]:
     return [course for course in courselist
-            if course.course in {
-                'CSC 4310',
-                'CSC 4330',
-                'CSC 4210',
-                'ECON 2100',
-                'PHIL 1010'}]
+            if course.course in intersting_courses]
 
 
-def get_all_schedules(courses: List[CourseOffering]):
+def get_all_schedules(courses: List[CourseOffering],
+                      dead_zones: TimeSpanSet):
     grouped_schedules = [list(v[1]) for v in
                          groupby(courses, key=lambda a: a.course)]
     for schedule in sorted(product(*grouped_schedules),
                            key=lambda sch: sum(
-                               (1 if v.remaining_capacity > 0 else 0) for v in
-                               sch)):
-        if is_valid(schedule):
+                               (1 if v.remaining_capacity > 0 else 0)
+                               for v in sch)):
+        if is_valid(schedule, dead_zones):
             yield schedule
 
 
-if __name__ == '__main__':
-    results = sorted(
-        get_all_schedules(
-            filter_my_courses(
-                parse_file('../resources/gsu courses.html'))))
-    print("found {} unique schedules".format(len(results)))
-    for schedule in results:
+def print_schedules(schedules: List[List[CourseOffering]]):
+    print("found {} unique schedules".format(len(schedules)))
+    for schedule in schedules:
         for v in sorted(schedule, key=lambda v: v.times):
             print('''\
 {course} {instructor} (#{crn}, {remaining_capacity} left)
@@ -109,3 +102,26 @@ if __name__ == '__main__':
             for time in v.times:
                 print('{:%a %H:%M}-{:%H:%M}'.format(*time))
         print('=' * 30)
+
+
+def main():
+    course_list = parse_file('../resources/gsu courses.html')
+    relevant_courses = filter_my_courses(course_list, intersting_courses={
+        'CSC 4310',
+        'CSC 4330',
+        'CSC 4210',
+        'ECON 2100',
+        'PHIL 1010',
+    })
+
+    time_set = TimeSpanSet()
+    for i in range(1, 7):
+        time_set.add_range(datetime(2018, 1, i, 0, 0),
+                           datetime(2018, 1, i, 10, 0))
+
+    schedules = sorted(get_all_schedules(relevant_courses, time_set))
+    print_schedules(schedules)
+
+
+if __name__ == '__main__':
+    main()
