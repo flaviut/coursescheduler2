@@ -107,11 +107,9 @@ def print_schedules(schedules: List[List[CourseOffering]]):
 def main():
     course_list = parse_file('../resources/gsu courses.html')
     relevant_courses = filter_my_courses(course_list, intersting_courses={
-        'CSC 4310',
-        'CSC 4330',
-        'CSC 4210',
-        'ECON 2100',
-        'PHIL 1010',
+        'CSC 4320',
+        'CSC 4110',
+        'CSC 4520',
     })
 
     time_set = TimeSpanSet()

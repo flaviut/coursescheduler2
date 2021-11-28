@@ -143,9 +143,9 @@ def register(user_id, user_pin, term_code, crn_list):
     for i, field in enumerate(all_crn_fields):
         if i < len(crn_list):
             try:
-                field.value = crn_list[i]
+                field.value = str(crn_list[i])
             except AttributeError:
-                print('Already registered for ' + crn_list[i] + '!')
+                print('Already registered for ' + str(crn_list[i]) + '!')
 
     t.sleep(random.gauss(10, 4))
     response = br.submit()
@@ -158,12 +158,18 @@ def register(user_id, user_pin, term_code, crn_list):
         'table', {
             'class': 'datadisplaytable',
             'summary': 'Current Schedule'}
-    )[0]
-    successful_courses = successful_table.findAll('tr')[1:]
+    )
+    if successful_table:
+        successful_courses = successful_table[0].findAll('tr')[1:]
+    else:
+        successful_courses = []
+
+    successful_crns = set()
 
     for row in successful_courses:
         contents = [e.text for e in row.findAll('td', {'class': 'dddefault'})]
         print(contents[2] + ' ' + contents[3])
+        successful_crns.add(int(contents[2]))
 
     if soup.findAll('span', {'class': 'errortext'}):
         print('Failed to register for the following courses:')
@@ -182,14 +188,14 @@ def register(user_id, user_pin, term_code, crn_list):
             print(contents[2] + ' ' + contents[3] + ' ' + contents[
                 8] + ' ' + '(' + contents[0] + ')')
 
-    return len(successful_courses)
+    return successful_crns
 
 
 # begin main method
 
 def main(reg_date, term, crns):
     # get user's info from them and login to bannerweb with it
-    user_id = os.environ['USERNAME']
+    user_id = os.environ['USER']
     user_pin = os.environ['PASSWORD']
 
     if not check_bw_credentials(user_id, user_pin):
@@ -200,12 +206,12 @@ def main(reg_date, term, crns):
 
     # continually try to register until at least one successful attempt has
     # occurred
-    registered_courses = 0
-    while registered_courses != 5:
+    registered_courses = set()
+    while crns not in registered_courses:
         # submit each crn in crn_list
         try:
-            registered_courses = register(user_id, user_pin, term, crns)
-            timesleep = (60 * 55) + random.gauss(8 * 60, 2 * 60)
+            registered_courses = register(user_id, user_pin, term, list(crns))
+            timesleep = (60 * 35) + random.gauss(3 * 60, 1 * 60)
             print('sleeping ', timesleep, ' seconds')
             t.sleep(timesleep)  # don't look TOO robotic...
         except Exception as e:
@@ -221,7 +227,7 @@ if __name__ == '__main__':
         main(
             reg_date=sys.argv[1],  # date of registration
             term=sys.argv[2],  # term you're registering for
-            crns=sys.argv[3:],  # list of CRNs to register for
+            crns=set([int(crn) for crn in sys.argv[3:]]),  # list of CRNs to register for
         )
     except IndexError:
         print('{} <registration open date, YYYY-MM-DD> <term, YYYYMM> <CRN>...')
