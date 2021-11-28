@@ -1,6 +1,9 @@
 # coursescheduler2
 
-Prototype application to help figure out acceptable schedules.
+Simple application to help figure out acceptable schedules, as well as a tool
+to automatically register for courses. Note: Banner typically limits you to
+just a few thousand registration attempts, so you may want to be careful using
+this tool.
 
 You give this program a list of the courses you'd like, and this program will
 give you a list of all non-overlapping schedules.
